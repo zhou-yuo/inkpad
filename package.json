@@ -1,0 +1,20 @@
+{
+  "name": "inkpad",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build --preset=cloudflare_pages",
+    "preview": "wrangler pages dev dist --compatibility-date=2026-05-24",
+    "db:migrate:local": "wrangler d1 migrations apply inkpad --local",
+    "db:migrate:remote": "wrangler d1 migrations apply inkpad --remote"
+  },
+  "dependencies": {
+    "nuxt": "^3.17.5",
+    "vue": "^3.5.14"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "wrangler": "^4.18.0"
+  }
+}
