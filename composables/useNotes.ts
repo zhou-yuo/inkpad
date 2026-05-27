@@ -116,7 +116,7 @@ export function useNotes() {
   }
 
   async function deleteNote(noteId: string) {
-    await $fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
+    await $fetch<{ ok: boolean }>(`/api/notes/${noteId}`, { method: 'delete' })
     notes.value = notes.value.filter((note) => note.id !== noteId)
     selectedId.value = notes.value[0]?.id || null
   }
