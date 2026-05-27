@@ -22,6 +22,7 @@ export default defineNuxtConfig({
       },
     },
     '/admin': { ssr: false },
+    '/public': { ssr: false },
     '/': { ssr: false },
   },
   runtimeConfig: {

@@ -5,4 +5,4 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "inkpad"
-database_id = "replace-with-your-d1-database-id"
+database_id = "fd4d33c7-f87a-48a8-a760-cc6d884d18eb"
