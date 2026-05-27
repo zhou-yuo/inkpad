@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KeyRound, LogOut, Plus, ShieldCheck, X } from '@lucide/vue'
+import { KeyRound, LogOut, Plus, Save, ShieldCheck, Trash2, X } from '@lucide/vue'
 
 const session = useSession()
 const notesStore = useNotes()
@@ -309,15 +309,15 @@ function initials(value?: string) {
           <div v-if="accountMenuOpen" class="account-menu" role="menu">
             <button type="button" role="menuitem" @click="openChangePassword">
               <KeyRound aria-hidden="true" />
-              <span>改密码</span>
+              <span>修改密码</span>
             </button>
             <NuxtLink v-if="session.user.value.role === 'admin'" to="/admin" role="menuitem" @click="accountMenuOpen = false">
               <ShieldCheck aria-hidden="true" />
-              <span>后台</span>
+              <span>管理后台</span>
             </NuxtLink>
             <button type="button" class="danger-item" role="menuitem" @click="requestLogout">
               <LogOut aria-hidden="true" />
-              <span>退出</span>
+              <span>退出登录</span>
             </button>
           </div>
         </div>
@@ -329,8 +329,14 @@ function initials(value?: string) {
         <button class="mobile-list" type="button" @click="showList = true">备忘录</button>
         <div class="toolbar-spacer" />
         <span class="save-indicator">{{ saveState === 'saving' ? '保存中...' : saveState === 'saved' ? '已保存' : selectedNote?.isDirty ? '未保存' : '' }}</span>
-        <button v-if="selectedNote" class="ghost-button" type="button" @click="notesStore.deleteNote(selectedNote.id)">删除</button>
-        <button v-if="selectedNote" class="primary-button small" type="button" @click="saveSelected">保存</button>
+        <button v-if="selectedNote" class="ghost-button" type="button" @click="notesStore.deleteNote(selectedNote.id)">
+          <Trash2 aria-hidden="true" />
+          <span>删除</span>
+        </button>
+        <button v-if="selectedNote" class="primary-button small" type="button" @click="saveSelected">
+          <Save aria-hidden="true" />
+          <span>保存</span>
+        </button>
       </header>
 
       <div v-if="selectedNote" class="editor-body">
@@ -366,8 +372,8 @@ function initials(value?: string) {
 
   <AppModal
     :open="showChangePasswordModal"
-    title="改密码"
-    description="更新登录密码，并重新保护密钥。"
+    title="修改密码"
+    description="更新用于解锁备忘录的登录密码。"
     @close="showChangePasswordModal = false"
   >
     <form class="modal-form" @submit.prevent="changePassword">

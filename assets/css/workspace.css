@@ -59,6 +59,16 @@
   stroke-width: 2.5;
 }
 
+.modal-close {
+  background: rgba(120, 120, 128, 0.13);
+  color: var(--muted);
+}
+
+.modal-close:hover {
+  background: rgba(120, 120, 128, 0.2);
+  color: var(--ink);
+}
+
 .rail-avatar-button {
   display: grid;
   place-items: center;
@@ -322,6 +332,20 @@
   min-height: 66px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.editor-toolbar .ghost-button,
+.editor-toolbar .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-toolbar .ghost-button svg,
+.editor-toolbar .primary-button svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.4;
 }
 
 .toolbar-spacer {

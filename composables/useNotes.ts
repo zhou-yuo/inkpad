@@ -4,15 +4,7 @@ type RemoteNote = {
   encryptedBody: string
   titleIv: string
   bodyIv: string
-  categoryId?: string | null
   tags?: string[]
-  createdAt: string
-  updatedAt: string
-}
-
-export type Category = {
-  id: string
-  name: string
   createdAt: string
   updatedAt: string
 }
@@ -21,7 +13,6 @@ export type Note = {
   id: string
   title: string
   body: string
-  categoryId: string | null
   tags: string[]
   createdAt: string
   updatedAt: string
@@ -30,7 +21,6 @@ export type Note = {
 
 export function useNotes() {
   const notes = useState<Note[]>('notes', () => [])
-  const categories = useState<Category[]>('categories', () => [])
   const selectedId = useState<string | null>('selected-note-id', () => null)
   const loading = useState('notes-loading', () => false)
   const cryptoBox = useVaultCrypto()
@@ -42,7 +32,6 @@ export function useNotes() {
       id: note.id,
       title: await cryptoBox.decryptText(note.encryptedTitle, note.titleIv),
       body: await cryptoBox.decryptText(note.encryptedBody, note.bodyIv),
-      categoryId: note.categoryId || null,
       tags: Array.isArray(note.tags) ? note.tags : [],
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
@@ -72,37 +61,9 @@ export function useNotes() {
     }
   }
 
-  async function fetchCategories() {
-    const response = await $fetch<{ categories: Category[] }>('/api/categories')
-    categories.value = response.categories
-  }
-
-  async function createCategory(name: string) {
-    const response = await $fetch<{ category: Category }>('/api/categories', { method: 'POST', body: { name } })
-    categories.value = [...categories.value, response.category].sort((a, b) => a.name.localeCompare(b.name))
-    return response.category
-  }
-
-  async function updateCategory(categoryId: string, name: string) {
-    const response = await $fetch<{ category: Pick<Category, 'id' | 'name' | 'updatedAt'> }>(`/api/categories/${categoryId}`, {
-      method: 'PUT',
-      body: { name },
-    })
-    categories.value = categories.value
-      .map((category) => category.id === categoryId ? { ...category, ...response.category } : category)
-      .sort((a, b) => a.name.localeCompare(b.name))
-    return response.category
-  }
-
-  async function deleteCategory(categoryId: string) {
-    await $fetch(`/api/categories/${categoryId}`, { method: 'DELETE' })
-    categories.value = categories.value.filter((category) => category.id !== categoryId)
-    notes.value = notes.value.map((note) => note.categoryId === categoryId ? { ...note, categoryId: null } : note)
-  }
-
-  async function createNote(categoryId: string | null = null) {
+  async function createNote() {
     const payload = await encryptPayload({ title: 'New Note', body: '' })
-    const response = await $fetch<{ note: RemoteNote }>('/api/notes', { method: 'POST', body: { ...payload, categoryId, tags: [] } })
+    const response = await $fetch<{ note: RemoteNote }>('/api/notes', { method: 'POST', body: { ...payload, tags: [] } })
     const note = await decryptNote(response.note)
     notes.value = [note, ...notes.value]
     selectedId.value = note.id
@@ -110,9 +71,8 @@ export function useNotes() {
 
   async function saveNote(note: Note) {
     const payload = await encryptPayload(note)
-    const response = await $fetch<{ note: RemoteNote }>(`/api/notes/${note.id}`, { method: 'PUT', body: { ...payload, categoryId: note.categoryId, tags: note.tags } })
+    const response = await $fetch<{ note: RemoteNote }>(`/api/notes/${note.id}`, { method: 'PUT', body: { ...payload, tags: note.tags } })
     note.updatedAt = response.note.updatedAt
-    note.categoryId = response.note.categoryId || null
     note.tags = Array.isArray(response.note.tags) ? response.note.tags : []
     note.title = note.title.trim() || 'Untitled'
     note.isDirty = false
@@ -148,15 +108,10 @@ export function useNotes() {
 
   return {
     notes,
-    categories,
     selectedId,
     selectedNote,
     loading,
     fetchNotes,
-    fetchCategories,
-    createCategory,
-    updateCategory,
-    deleteCategory,
     createNote,
     saveNote,
     saveAllNotes,
