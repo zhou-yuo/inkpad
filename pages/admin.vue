@@ -128,6 +128,7 @@ async function confirmResetPassword() {
               <tr>
                 <th>ID</th>
                 <th>Owner</th>
+                <th>Visibility</th>
                 <th>Bytes</th>
                 <th>Updated</th>
                 <th>Status</th>
@@ -137,6 +138,7 @@ async function confirmResetPassword() {
               <tr v-for="note in notes" :key="note.id">
                 <td>{{ note.id.slice(0, 14) }}</td>
                 <td>{{ note.account }}</td>
+                <td>{{ note.visibility === 'public' ? 'Public' : 'Private' }}</td>
                 <td>{{ note.encryptedSize }}</td>
                 <td>{{ formatDate(note.updatedAt) }}</td>
                 <td>{{ note.deletedAt ? 'Deleted' : 'Active' }}</td>

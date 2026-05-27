@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KeyRound, LogOut, Plus, Save, ShieldCheck, Trash2, X } from '@lucide/vue'
+import { Globe2, KeyRound, LockKeyhole, LogOut, Plus, Save, ShieldCheck, Trash2, X } from '@lucide/vue'
 
 const session = useSession()
 const notesStore = useNotes()
@@ -18,6 +18,7 @@ const showList = ref(true)
 const accountMenuOpen = ref(false)
 const showChangePasswordModal = ref(false)
 const showLogoutConfirm = ref(false)
+const showPublicConfirm = ref(false)
 const searchQuery = ref('')
 const tagDraft = ref('')
 const tagInputOpen = ref(false)
@@ -173,6 +174,23 @@ function markDirty() {
   if (selectedNote.value) selectedNote.value.isDirty = true
 }
 
+function setVisibility(visibility: 'private' | 'public') {
+  if (!selectedNote.value || selectedNote.value.visibility === visibility) return
+  if (visibility === 'public') {
+    showPublicConfirm.value = true
+    return
+  }
+  selectedNote.value.visibility = 'private'
+  markDirty()
+}
+
+function confirmPublicVisibility() {
+  if (!selectedNote.value) return
+  selectedNote.value.visibility = 'public'
+  showPublicConfirm.value = false
+  markDirty()
+}
+
 async function createNote() {
   vault.touch()
   await notesStore.createNote()
@@ -225,6 +243,10 @@ function initials(value?: string) {
       <div class="app-icon">I</div>
       <h1>Inkpad</h1>
       <p>加密备忘录，简洁好用。</p>
+      <NuxtLink class="brand-public-link" to="/public">
+        <Globe2 aria-hidden="true" />
+        <span>查看公开备忘录</span>
+      </NuxtLink>
     </div>
 
     <form class="auth-card glass" @submit.prevent="submitAuth">
@@ -254,6 +276,10 @@ function initials(value?: string) {
       <div class="app-icon">I</div>
       <h1>已锁定</h1>
       <p>当前备忘录已锁定。</p>
+      <NuxtLink class="brand-public-link" to="/public">
+        <Globe2 aria-hidden="true" />
+        <span>查看公开备忘录</span>
+      </NuxtLink>
     </div>
     <form class="auth-card glass" @submit.prevent="unlockVault">
       <label>
@@ -282,6 +308,10 @@ function initials(value?: string) {
           <span>筛选</span>
           <input v-model="searchQuery" placeholder="搜索标题或关键字">
         </label>
+        <NuxtLink class="public-link" to="/public">
+          <Globe2 aria-hidden="true" />
+          <span>公开备忘录</span>
+        </NuxtLink>
       </section>
       <div class="note-list">
         <button
@@ -294,6 +324,7 @@ function initials(value?: string) {
           <strong>{{ note.title || '无标题' }}</strong>
           <span class="note-meta">
             <span>{{ formatDate(note.updatedAt) }}</span>
+            <span v-if="note.visibility === 'public'" class="visibility-pill">Public</span>
             <span v-for="tag in note.tags.slice(0, 2)" :key="tag" class="tag-pill">{{ tag }}</span>
             <span v-if="note.tags.length > 2" class="tag-pill muted">+{{ note.tags.length - 2 }}</span>
           </span>
@@ -340,6 +371,22 @@ function initials(value?: string) {
       </header>
 
       <div v-if="selectedNote" class="editor-body">
+        <section class="visibility-editor" aria-label="Choose visibility">
+          <div>
+            <strong>Choose visibility</strong>
+            <span>{{ selectedNote.visibility === 'public' ? 'Everyone can read this note.' : 'Only you can read this note.' }}</span>
+          </div>
+          <div class="visibility-options" role="group" aria-label="Note visibility">
+            <button type="button" :class="{ active: selectedNote.visibility === 'private' }" @click="setVisibility('private')">
+              <LockKeyhole aria-hidden="true" />
+              <span>Private</span>
+            </button>
+            <button type="button" :class="{ active: selectedNote.visibility === 'public' }" @click="setVisibility('public')">
+              <Globe2 aria-hidden="true" />
+              <span>Public</span>
+            </button>
+          </div>
+        </section>
         <div class="tag-editor" aria-label="关键字标签">
           <span v-for="tag in selectedNote.tags" :key="tag" class="editable-tag">
             {{ tag }}
@@ -407,6 +454,15 @@ function initials(value?: string) {
     :loading="logoutSaving"
     @close="showLogoutConfirm = false"
     @confirm="confirmLogout"
+  />
+
+  <ConfirmDialog
+    :open="showPublicConfirm"
+    title="公开这条备忘录？"
+    message="公开后，所有人都可以读取这条备忘录的标题和正文。切回私有会停止公开访问，但不能撤回别人已经看到或复制的内容。"
+    confirm-text="公开"
+    @close="showPublicConfirm = false"
+    @confirm="confirmPublicVisibility"
   />
 
 </template>

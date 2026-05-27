@@ -4,15 +4,19 @@ type RemoteNote = {
   encryptedBody: string
   titleIv: string
   bodyIv: string
+  visibility: NoteVisibility
   tags?: string[]
   createdAt: string
   updatedAt: string
 }
 
+export type NoteVisibility = 'private' | 'public'
+
 export type Note = {
   id: string
   title: string
   body: string
+  visibility: NoteVisibility
   tags: string[]
   createdAt: string
   updatedAt: string
@@ -32,6 +36,7 @@ export function useNotes() {
       id: note.id,
       title: await cryptoBox.decryptText(note.encryptedTitle, note.titleIv),
       body: await cryptoBox.decryptText(note.encryptedBody, note.bodyIv),
+      visibility: note.visibility === 'public' ? 'public' : 'private',
       tags: Array.isArray(note.tags) ? note.tags : [],
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
@@ -63,7 +68,7 @@ export function useNotes() {
 
   async function createNote() {
     const payload = await encryptPayload({ title: 'New Note', body: '' })
-    const response = await $fetch<{ note: RemoteNote }>('/api/notes', { method: 'POST', body: { ...payload, tags: [] } })
+    const response = await $fetch<{ note: RemoteNote }>('/api/notes', { method: 'POST', body: { ...payload, visibility: 'private', tags: [] } })
     const note = await decryptNote(response.note)
     notes.value = [note, ...notes.value]
     selectedId.value = note.id
@@ -71,8 +76,18 @@ export function useNotes() {
 
   async function saveNote(note: Note) {
     const payload = await encryptPayload(note)
-    const response = await $fetch<{ note: RemoteNote }>(`/api/notes/${note.id}`, { method: 'PUT', body: { ...payload, tags: note.tags } })
+    const response = await $fetch<{ note: RemoteNote }>(`/api/notes/${note.id}`, {
+      method: 'PUT',
+      body: {
+        ...payload,
+        visibility: note.visibility,
+        publicTitle: note.visibility === 'public' ? note.title.trim() || 'Untitled' : null,
+        publicBody: note.visibility === 'public' ? note.body : null,
+        tags: note.tags,
+      },
+    })
     note.updatedAt = response.note.updatedAt
+    note.visibility = response.note.visibility === 'public' ? 'public' : 'private'
     note.tags = Array.isArray(response.note.tags) ? response.note.tags : []
     note.title = note.title.trim() || 'Untitled'
     note.isDirty = false
