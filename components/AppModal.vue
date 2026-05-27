@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { X } from '@lucide/vue'
+
 const props = withDefaults(defineProps<{
   open: boolean
   title: string
@@ -30,7 +32,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <h2>{{ title }}</h2>
               <p v-if="description">{{ description }}</p>
             </div>
-            <button class="icon-button modal-close" type="button" aria-label="Close" @click="emit('close')">x</button>
+            <button class="icon-button modal-close" type="button" aria-label="Close" @click="emit('close')">
+              <X aria-hidden="true" />
+            </button>
           </header>
           <div class="modal-body">
             <slot />

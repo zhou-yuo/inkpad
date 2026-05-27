@@ -16,26 +16,26 @@ export default defineEventHandler(async (event) => {
     encryptedBody?: string
     titleIv?: string
     bodyIv?: string
-    categoryId?: string | null
+    tags?: unknown
   }>(event)
   const encryptedTitle = requireString(body.encryptedTitle, 'Encrypted title', 1, 20000)
   const encryptedBody = requireString(body.encryptedBody, 'Encrypted body', 1, 1000000)
   const titleIv = requireString(body.titleIv, 'Title IV', 8, 200)
   const bodyIv = requireString(body.bodyIv, 'Body IV', 8, 200)
-  const categoryId = typeof body.categoryId === 'string' && body.categoryId.trim() ? body.categoryId : null
-  if (categoryId) {
-    const category = await getDb(event).prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?')
-      .bind(categoryId, user.id)
-      .first()
-    if (!category) throw createError({ statusCode: 400, statusMessage: 'Category not found.' })
-  }
+  const tags = Array.isArray(body.tags)
+    ? [...new Set(body.tags
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter(Boolean))]
+        .slice(0, 5)
+    : []
   const updatedAt = nowIso()
 
   await getDb(event).prepare(`
     UPDATE notes
-    SET encrypted_title = ?, encrypted_body = ?, title_iv = ?, body_iv = ?, category_id = ?, preview_hash = ?, updated_at = ?
+    SET encrypted_title = ?, encrypted_body = ?, title_iv = ?, body_iv = ?, tags = ?, preview_hash = ?, updated_at = ?
     WHERE id = ? AND user_id = ?
-  `).bind(encryptedTitle, encryptedBody, titleIv, bodyIv, categoryId, await sha256(encryptedTitle), updatedAt, id, user.id).run()
+  `).bind(encryptedTitle, encryptedBody, titleIv, bodyIv, JSON.stringify(tags), await sha256(encryptedTitle), updatedAt, id, user.id).run()
 
-  return { note: { id, encryptedTitle, encryptedBody, titleIv, bodyIv, categoryId, updatedAt } }
+  return { note: { id, encryptedTitle, encryptedBody, titleIv, bodyIv, tags, updatedAt } }
 })

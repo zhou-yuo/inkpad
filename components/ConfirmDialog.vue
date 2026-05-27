@@ -8,8 +8,8 @@ withDefaults(defineProps<{
   danger?: boolean
   loading?: boolean
 }>(), {
-  confirmText: 'Confirm',
-  cancelText: 'Cancel',
+  confirmText: '确认',
+  cancelText: '取消',
   danger: false,
   loading: false,
 })

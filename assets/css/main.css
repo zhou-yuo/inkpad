@@ -378,7 +378,12 @@ th {
   flex: 0 0 auto;
   background: rgba(120, 120, 128, 0.13);
   color: var(--muted);
-  font-size: 18px;
+}
+
+.modal-close svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.4;
 }
 
 .modal-body {
