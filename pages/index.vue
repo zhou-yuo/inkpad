@@ -19,8 +19,9 @@ const showChangePasswordModal = ref(false)
 const showLogoutConfirm = ref(false)
 const categoryFilter = ref<'all' | 'uncategorized' | string>('all')
 const categoryDraft = ref('')
-const editingCategoryId = ref<string | null>(null)
-const editingCategoryName = ref('')
+const selectedCategoryId = ref<'uncategorized' | string>('uncategorized')
+const selectedCategoryName = ref('')
+const categoryCreateError = ref('')
 const categoryError = ref('')
 const showCategoryDeleteConfirm = ref(false)
 const categoryToDelete = ref<{ id: string, name: string } | null>(null)
@@ -35,11 +36,22 @@ let lockTimer: ReturnType<typeof window.setInterval> | null = null
 const isLocked = computed(() => Boolean(session.user.value && !session.vaultKey.value))
 const selectedNote = notesStore.selectedNote
 const categoryById = computed(() => new Map(notesStore.categories.value.map((category) => [category.id, category])))
+const selectedCategory = computed(() => selectedCategoryId.value !== 'uncategorized' ? categoryById.value.get(selectedCategoryId.value) || null : null)
 const uncategorizedCount = computed(() => notesStore.notes.value.filter((note) => !note.categoryId).length)
+const selectedCategoryCount = computed(() => {
+  if (selectedCategoryId.value === 'uncategorized') return uncategorizedCount.value
+  return categoryNoteCount(selectedCategoryId.value)
+})
 const filteredNotes = computed(() => {
   if (categoryFilter.value === 'all') return notesStore.notes.value
   if (categoryFilter.value === 'uncategorized') return notesStore.notes.value.filter((note) => !note.categoryId)
   return notesStore.notes.value.filter((note) => note.categoryId === categoryFilter.value)
+})
+
+watch(selectedCategoryId, (categoryId) => {
+  categoryCreateError.value = ''
+  categoryError.value = ''
+  selectedCategoryName.value = categoryId !== 'uncategorized' ? categoryById.value.get(categoryId)?.name || '' : ''
 })
 
 function closeAccountMenuOnOutsideClick(event: PointerEvent) {
@@ -188,6 +200,12 @@ function openCategoryNotes(filter: 'uncategorized' | string) {
   showList.value = true
 }
 
+function selectCategory(categoryId: 'uncategorized' | string) {
+  selectedCategoryId.value = categoryId
+  activeNav.value = 'categories'
+  showList.value = false
+}
+
 async function createNoteWithCategory() {
   vault.touch()
   await notesStore.createNote(categoryFilter.value === 'all' || categoryFilter.value === 'uncategorized' ? null : categoryFilter.value)
@@ -195,37 +213,26 @@ async function createNoteWithCategory() {
 }
 
 async function addCategory() {
-  categoryError.value = ''
+  categoryCreateError.value = ''
   if (!categoryDraft.value.trim()) return
   categorySaving.value = true
   try {
-    await notesStore.createCategory(categoryDraft.value)
+    const category = await notesStore.createCategory(categoryDraft.value)
     categoryDraft.value = ''
+    selectCategory(category.id)
   } catch (error: any) {
-    categoryError.value = error?.statusMessage || error?.message || 'Could not create category.'
+    categoryCreateError.value = error?.statusMessage || error?.message || 'Could not create category.'
   } finally {
     categorySaving.value = false
   }
 }
 
-function startEditCategory(category: { id: string, name: string }) {
+async function saveSelectedCategory() {
   categoryError.value = ''
-  editingCategoryId.value = category.id
-  editingCategoryName.value = category.name
-}
-
-function cancelEditCategory() {
-  editingCategoryId.value = null
-  editingCategoryName.value = ''
-}
-
-async function saveCategoryEdit(categoryId: string) {
-  categoryError.value = ''
-  if (!editingCategoryName.value.trim()) return
+  if (!selectedCategory.value || !selectedCategoryName.value.trim()) return
   categorySaving.value = true
   try {
-    await notesStore.updateCategory(categoryId, editingCategoryName.value)
-    cancelEditCategory()
+    await notesStore.updateCategory(selectedCategory.value.id, selectedCategoryName.value)
   } catch (error: any) {
     categoryError.value = error?.statusMessage || error?.message || 'Could not update category.'
   } finally {
@@ -249,6 +256,7 @@ async function confirmDeleteCategory() {
   try {
     await notesStore.deleteCategory(categoryToDelete.value.id)
     if (categoryFilter.value === categoryToDelete.value.id) categoryFilter.value = 'all'
+    if (selectedCategoryId.value === categoryToDelete.value.id) selectedCategoryId.value = 'uncategorized'
     showCategoryDeleteConfirm.value = false
     categoryToDelete.value = null
   } catch (error: any) {
@@ -284,15 +292,15 @@ function initials(value?: string) {
       </div>
       <label v-if="mode === 'register'">
         昵称
-        <input v-model="displayName" autocomplete="name" placeholder="Yu Zhou">
+        <input v-model="displayName" autocomplete="name" placeholder="请输入昵称">
       </label>
       <label>
         账号
-        <input v-model="account" autocomplete="username" placeholder="inkpad_account" minlength="3" maxlength="40" required>
+        <input v-model="account" autocomplete="username" placeholder="请输入账号" minlength="3" maxlength="40" required>
       </label>
       <label>
         密码
-        <input v-model="password" type="password" autocomplete="current-password" minlength="8" required>
+        <input v-model="password" type="password" autocomplete="current-password" placeholder="请输入密码" minlength="8" required>
       </label>
       <p v-if="authError" class="error">{{ authError }}</p>
       <button class="primary-button" type="submit">{{ mode === 'login' ? '登录' : '注册' }}</button>
@@ -303,7 +311,7 @@ function initials(value?: string) {
     <div class="brand-panel">
       <div class="app-icon">I</div>
       <h1>已锁定</h1>
-      <p>刷新后需要重新解锁密钥。</p>
+      <p>当前备忘录已锁定。</p>
     </div>
     <form class="auth-card glass" @submit.prevent="unlockVault">
       <label>
@@ -358,6 +366,13 @@ function initials(value?: string) {
           </select>
         </div>
       </section>
+      <section v-else class="category-create-panel">
+        <form class="category-admin-form" @submit.prevent="addCategory">
+          <input v-model="categoryDraft" maxlength="40" placeholder="新分类" :disabled="categorySaving">
+          <button class="primary-button small" type="submit" :disabled="categorySaving || !categoryDraft.trim()">添加</button>
+        </form>
+        <p v-if="categoryCreateError" class="error category-error">{{ categoryCreateError }}</p>
+      </section>
       <div v-if="activeNav === 'notes'" class="note-list">
         <button
           v-for="note in filteredNotes"
@@ -375,7 +390,7 @@ function initials(value?: string) {
         <p v-if="!filteredNotes.length" class="empty-hint">{{ notesStore.notes.value.length ? '当前分类暂无备忘录' : '暂无备忘录' }}</p>
       </div>
       <div v-else class="category-notes-list">
-        <button class="category-summary-row" type="button" title="查看未分类备忘录" @click="openCategoryNotes('uncategorized')">
+        <button class="category-summary-row" :class="{ active: selectedCategoryId === 'uncategorized' }" type="button" title="查看未分类详情" @click="selectCategory('uncategorized')">
           <strong>未分类</strong>
           <span>{{ uncategorizedCount }}</span>
         </button>
@@ -383,9 +398,10 @@ function initials(value?: string) {
           v-for="category in notesStore.categories.value"
           :key="category.id"
           class="category-summary-row"
+          :class="{ active: selectedCategoryId === category.id }"
           type="button"
-          :title="`查看 ${category.name} 下的备忘录`"
-          @click="openCategoryNotes(category.id)"
+          :title="`查看 ${category.name} 详情`"
+          @click="selectCategory(category.id)"
         >
           <strong>{{ category.name }}</strong>
           <span>{{ categoryNoteCount(category.id) }}</span>
@@ -423,46 +439,38 @@ function initials(value?: string) {
       <header class="editor-toolbar">
         <button class="mobile-list" type="button" @click="showList = true">分类</button>
         <div class="category-toolbar-title">
-          <strong>分类管理</strong>
-          <span>{{ notesStore.categories.value.length }} 个分类</span>
+          <strong>{{ selectedCategoryId === 'uncategorized' ? '未分类' : selectedCategory?.name || '分类详情' }}</strong>
+          <span>{{ selectedCategoryCount }} 条备忘录</span>
         </div>
       </header>
 
       <div class="category-admin">
-        <form class="category-admin-form" @submit.prevent="addCategory">
-          <input v-model="categoryDraft" maxlength="40" placeholder="新分类" :disabled="categorySaving">
-          <button class="primary-button small" type="submit" :disabled="categorySaving || !categoryDraft.trim()">添加</button>
-        </form>
         <p v-if="categoryError" class="error category-error">{{ categoryError }}</p>
 
-        <div class="category-table" role="table" aria-label="分类管理">
-          <div class="category-table-head" role="row">
-            <span>分类</span>
-            <span>备忘录</span>
-            <span>操作</span>
+        <div class="category-detail">
+          <div class="category-detail-card">
+            <div class="category-stat">
+              <span>备忘录</span>
+              <strong>{{ selectedCategoryCount }}</strong>
+            </div>
+            <button class="primary-button" type="button" @click="openCategoryNotes(selectedCategoryId)">查看备忘录</button>
           </div>
-          <div class="category-admin-row readonly" role="row">
-            <strong>未分类</strong>
-            <span>{{ uncategorizedCount }}</span>
-            <button class="ghost-button" type="button" @click="openCategoryNotes('uncategorized')">查看</button>
-          </div>
-          <div v-for="category in notesStore.categories.value" :key="category.id" class="category-admin-row" role="row">
-            <form v-if="editingCategoryId === category.id" class="category-admin-edit" @submit.prevent="saveCategoryEdit(category.id)">
-              <input v-model="editingCategoryName" maxlength="40" :disabled="categorySaving">
-              <button class="ghost-button" type="submit" :disabled="categorySaving || !editingCategoryName.trim()">保存</button>
-              <button class="ghost-button" type="button" :disabled="categorySaving" @click="cancelEditCategory">取消</button>
-            </form>
-            <template v-else>
-              <strong>{{ category.name }}</strong>
-              <span>{{ categoryNoteCount(category.id) }}</span>
-              <div class="category-actions">
-                <button class="ghost-button" type="button" @click="openCategoryNotes(category.id)">查看</button>
-                <button class="mini-button" type="button" title="编辑分类" @click="startEditCategory(category)">改</button>
-                <button class="mini-button danger-mini" type="button" title="删除分类" @click="requestDeleteCategory(category)">删</button>
-              </div>
-            </template>
-          </div>
-          <p v-if="!notesStore.categories.value.length" class="empty-hint">暂无分类，可以先添加一个。</p>
+
+          <section v-if="selectedCategoryId === 'uncategorized'" class="category-detail-section">
+            <h2>未分类</h2>
+            <p>没有指定分类的备忘录会显示在这里。</p>
+          </section>
+
+          <form v-else-if="selectedCategory" class="category-detail-section category-detail-form" @submit.prevent="saveSelectedCategory">
+            <label>
+              分类名称
+              <input v-model="selectedCategoryName" maxlength="40" :disabled="categorySaving">
+            </label>
+            <div class="category-detail-actions">
+              <button class="primary-button" type="submit" :disabled="categorySaving || !selectedCategoryName.trim()">保存</button>
+              <button class="ghost-button danger-text" type="button" :disabled="categorySaving" @click="requestDeleteCategory(selectedCategory)">删除分类</button>
+            </div>
+          </form>
         </div>
       </div>
     </article>
@@ -499,7 +507,7 @@ function initials(value?: string) {
   <ConfirmDialog
     :open="showLogoutConfirm"
     title="退出？"
-    message="浏览器里的密钥会被清除，下次需要密码解锁。"
+    message="是否确认退出"
     confirm-text="退出"
     :danger="true"
     :loading="logoutSaving"
