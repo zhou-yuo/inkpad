@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { KeyRound, LogOut, Plus, ShieldCheck, X } from '@lucide/vue'
+
 const session = useSession()
 const notesStore = useNotes()
 const vault = useVaultCrypto()
@@ -13,45 +15,31 @@ const passwordError = ref('')
 const passwordNotice = ref('')
 const saveState = ref<'idle' | 'saving' | 'saved'>('idle')
 const showList = ref(true)
-const activeNav = ref<'notes' | 'categories'>('notes')
 const accountMenuOpen = ref(false)
 const showChangePasswordModal = ref(false)
 const showLogoutConfirm = ref(false)
-const categoryFilter = ref<'all' | 'uncategorized' | string>('all')
-const categoryDraft = ref('')
-const selectedCategoryId = ref<'uncategorized' | string>('uncategorized')
-const selectedCategoryName = ref('')
-const categoryCreateError = ref('')
-const categoryError = ref('')
-const showCategoryDeleteConfirm = ref(false)
-const categoryToDelete = ref<{ id: string, name: string } | null>(null)
+const searchQuery = ref('')
+const tagDraft = ref('')
+const tagInputOpen = ref(false)
+const tagInput = ref<HTMLInputElement | null>(null)
 const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 const passwordSaving = ref(false)
 const logoutSaving = ref(false)
-const categorySaving = ref(false)
+const maxTags = 5
 let lockTimer: ReturnType<typeof window.setInterval> | null = null
 
 const isLocked = computed(() => Boolean(session.user.value && !session.vaultKey.value))
 const selectedNote = notesStore.selectedNote
-const categoryById = computed(() => new Map(notesStore.categories.value.map((category) => [category.id, category])))
-const selectedCategory = computed(() => selectedCategoryId.value !== 'uncategorized' ? categoryById.value.get(selectedCategoryId.value) || null : null)
-const uncategorizedCount = computed(() => notesStore.notes.value.filter((note) => !note.categoryId).length)
-const selectedCategoryCount = computed(() => {
-  if (selectedCategoryId.value === 'uncategorized') return uncategorizedCount.value
-  return categoryNoteCount(selectedCategoryId.value)
-})
 const filteredNotes = computed(() => {
-  if (categoryFilter.value === 'all') return notesStore.notes.value
-  if (categoryFilter.value === 'uncategorized') return notesStore.notes.value.filter((note) => !note.categoryId)
-  return notesStore.notes.value.filter((note) => note.categoryId === categoryFilter.value)
-})
-
-watch(selectedCategoryId, (categoryId) => {
-  categoryCreateError.value = ''
-  categoryError.value = ''
-  selectedCategoryName.value = categoryId !== 'uncategorized' ? categoryById.value.get(categoryId)?.name || '' : ''
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return notesStore.notes.value
+  return notesStore.notes.value.filter((note) => {
+    const titleMatch = note.title.toLowerCase().includes(query)
+    const tagMatch = note.tags.some((tag) => tag.toLowerCase().includes(query))
+    return titleMatch || tagMatch
+  })
 })
 
 function closeAccountMenuOnOutsideClick(event: PointerEvent) {
@@ -82,7 +70,6 @@ onBeforeUnmount(() => {
 })
 
 async function loadNotesAndMigrateIfNeeded(password: string) {
-  await notesStore.fetchCategories()
   await notesStore.fetchNotes()
   if (session.vaultMode.value !== 'legacy' || !session.user.value) return
   await vault.generateVaultKey()
@@ -186,84 +173,39 @@ function markDirty() {
   if (selectedNote.value) selectedNote.value.isDirty = true
 }
 
-function categoryName(categoryId?: string | null) {
-  return categoryId ? categoryById.value.get(categoryId)?.name || '' : ''
-}
-
-function categoryNoteCount(categoryId: string) {
-  return notesStore.notes.value.filter((note) => note.categoryId === categoryId).length
-}
-
-function openCategoryNotes(filter: 'uncategorized' | string) {
-  categoryFilter.value = filter
-  activeNav.value = 'notes'
-  showList.value = true
-}
-
-function selectCategory(categoryId: 'uncategorized' | string) {
-  selectedCategoryId.value = categoryId
-  activeNav.value = 'categories'
-  showList.value = false
-}
-
-async function createNoteWithCategory() {
+async function createNote() {
   vault.touch()
-  await notesStore.createNote(categoryFilter.value === 'all' || categoryFilter.value === 'uncategorized' ? null : categoryFilter.value)
+  await notesStore.createNote()
   showList.value = false
 }
 
-async function addCategory() {
-  categoryCreateError.value = ''
-  if (!categoryDraft.value.trim()) return
-  categorySaving.value = true
-  try {
-    const category = await notesStore.createCategory(categoryDraft.value)
-    categoryDraft.value = ''
-    selectCategory(category.id)
-  } catch (error: any) {
-    categoryCreateError.value = error?.statusMessage || error?.message || 'Could not create category.'
-  } finally {
-    categorySaving.value = false
+function openTagInput() {
+  if (!selectedNote.value || selectedNote.value.tags.length >= maxTags) return
+  tagInputOpen.value = true
+  nextTick(() => tagInput.value?.focus())
+}
+
+function addTag() {
+  if (!selectedNote.value) return
+  const value = tagDraft.value.trim()
+  if (!value || selectedNote.value.tags.length >= maxTags) return
+  if (!selectedNote.value.tags.some((tag) => tag.toLowerCase() === value.toLowerCase())) {
+    selectedNote.value.tags = [...selectedNote.value.tags, value]
+    markDirty()
   }
+  tagDraft.value = ''
+  tagInputOpen.value = selectedNote.value.tags.length < maxTags
 }
 
-async function saveSelectedCategory() {
-  categoryError.value = ''
-  if (!selectedCategory.value || !selectedCategoryName.value.trim()) return
-  categorySaving.value = true
-  try {
-    await notesStore.updateCategory(selectedCategory.value.id, selectedCategoryName.value)
-  } catch (error: any) {
-    categoryError.value = error?.statusMessage || error?.message || 'Could not update category.'
-  } finally {
-    categorySaving.value = false
-  }
+function closeTagInput() {
+  tagDraft.value = ''
+  tagInputOpen.value = false
 }
 
-function requestDeleteCategory(category: { id: string, name: string }) {
-  categoryToDelete.value = category
-  showCategoryDeleteConfirm.value = true
-}
-
-function selectNav(view: 'notes' | 'categories') {
-  activeNav.value = view
-  showList.value = true
-}
-
-async function confirmDeleteCategory() {
-  if (!categoryToDelete.value) return
-  categorySaving.value = true
-  try {
-    await notesStore.deleteCategory(categoryToDelete.value.id)
-    if (categoryFilter.value === categoryToDelete.value.id) categoryFilter.value = 'all'
-    if (selectedCategoryId.value === categoryToDelete.value.id) selectedCategoryId.value = 'uncategorized'
-    showCategoryDeleteConfirm.value = false
-    categoryToDelete.value = null
-  } catch (error: any) {
-    categoryError.value = error?.statusMessage || error?.message || 'Could not delete category.'
-  } finally {
-    categorySaving.value = false
-  }
+function removeTag(tagToRemove: string) {
+  if (!selectedNote.value) return
+  selectedNote.value.tags = selectedNote.value.tags.filter((tag) => tag !== tagToRemove)
+  markDirty()
 }
 
 function formatDate(value: string) {
@@ -325,55 +267,23 @@ function initials(value?: string) {
   </section>
 
   <section v-else class="notes-app">
-    <nav class="nav-rail glass" aria-label="Workspace">
-      <div class="account-block rail-account">
-        <button class="rail-avatar-button" type="button" :aria-expanded="accountMenuOpen" title="账号" @click="accountMenuOpen = !accountMenuOpen">
-          <span class="avatar">{{ initials(session.user.value.displayName || session.user.value.account) }}</span>
-        </button>
-        <div v-if="accountMenuOpen" class="account-menu rail-menu" role="menu">
-          <button type="button" role="menuitem" @click="openChangePassword">改密码</button>
-          <NuxtLink v-if="session.user.value.role === 'admin'" to="/admin" role="menuitem" @click="accountMenuOpen = false">后台</NuxtLink>
-          <button type="button" class="danger-item" role="menuitem" @click="requestLogout">退出</button>
-        </div>
-      </div>
-      <div class="rail-menu-list">
-        <button class="rail-item" :class="{ active: activeNav === 'notes' }" type="button" title="备忘录" @click="selectNav('notes')">
-          <span aria-hidden="true">N</span>
-          <small>备忘录</small>
-        </button>
-        <button class="rail-item" :class="{ active: activeNav === 'categories' }" type="button" title="分类" @click="selectNav('categories')">
-          <span aria-hidden="true">C</span>
-          <small>分类</small>
-        </button>
-      </div>
-    </nav>
-
     <aside class="sidebar glass" :class="{ open: showList }">
       <header class="sidebar-head">
         <div>
-          <strong>{{ activeNav === 'notes' ? '备忘录' : '分类' }}</strong>
-          <span>{{ activeNav === 'notes' ? `${filteredNotes.length} / ${notesStore.notes.value.length} 条` : `${notesStore.categories.value.length} 个` }}</span>
+          <strong>备忘录</strong>
+          <span>{{ filteredNotes.length }} / {{ notesStore.notes.value.length }} 条</span>
         </div>
-        <button v-if="activeNav === 'notes'" class="icon-button" title="新建" @click="createNoteWithCategory">+</button>
+        <button class="icon-button" title="新建" @click="createNote">
+          <Plus aria-hidden="true" />
+        </button>
       </header>
-      <section v-if="activeNav === 'notes'" class="new-note-panel">
-        <div class="new-note-category">
+      <section class="new-note-panel">
+        <label class="note-search">
           <span>筛选</span>
-          <select v-model="categoryFilter">
-            <option value="all">全部分类</option>
-            <option value="uncategorized">未分类</option>
-            <option v-for="category in notesStore.categories.value" :key="category.id" :value="category.id">{{ category.name }}</option>
-          </select>
-        </div>
+          <input v-model="searchQuery" placeholder="搜索标题或关键字">
+        </label>
       </section>
-      <section v-else class="category-create-panel">
-        <form class="category-admin-form" @submit.prevent="addCategory">
-          <input v-model="categoryDraft" maxlength="40" placeholder="新分类" :disabled="categorySaving">
-          <button class="primary-button small" type="submit" :disabled="categorySaving || !categoryDraft.trim()">添加</button>
-        </form>
-        <p v-if="categoryCreateError" class="error category-error">{{ categoryCreateError }}</p>
-      </section>
-      <div v-if="activeNav === 'notes'" class="note-list">
+      <div class="note-list">
         <button
           v-for="note in filteredNotes"
           :key="note.id"
@@ -384,34 +294,39 @@ function initials(value?: string) {
           <strong>{{ note.title || '无标题' }}</strong>
           <span class="note-meta">
             <span>{{ formatDate(note.updatedAt) }}</span>
-            <span v-if="categoryName(note.categoryId)" class="category-pill">{{ categoryName(note.categoryId) }}</span>
+            <span v-for="tag in note.tags.slice(0, 2)" :key="tag" class="tag-pill">{{ tag }}</span>
+            <span v-if="note.tags.length > 2" class="tag-pill muted">+{{ note.tags.length - 2 }}</span>
           </span>
         </button>
-        <p v-if="!filteredNotes.length" class="empty-hint">{{ notesStore.notes.value.length ? '当前分类暂无备忘录' : '暂无备忘录' }}</p>
+        <p v-if="!filteredNotes.length" class="empty-hint">{{ notesStore.notes.value.length ? '没有匹配的备忘录' : '暂无备忘录' }}</p>
       </div>
-      <div v-else class="category-notes-list">
-        <button class="category-summary-row" :class="{ active: selectedCategoryId === 'uncategorized' }" type="button" title="查看未分类详情" @click="selectCategory('uncategorized')">
-          <strong>未分类</strong>
-          <span>{{ uncategorizedCount }}</span>
-        </button>
-        <button
-          v-for="category in notesStore.categories.value"
-          :key="category.id"
-          class="category-summary-row"
-          :class="{ active: selectedCategoryId === category.id }"
-          type="button"
-          :title="`查看 ${category.name} 详情`"
-          @click="selectCategory(category.id)"
-        >
-          <strong>{{ category.name }}</strong>
-          <span>{{ categoryNoteCount(category.id) }}</span>
-        </button>
-      </div>
+      <footer class="sidebar-footer">
+        <div class="account-block sidebar-account">
+          <button class="sidebar-account-button" type="button" :aria-expanded="accountMenuOpen" title="账号" @click="accountMenuOpen = !accountMenuOpen">
+            <span class="avatar">{{ initials(session.user.value.displayName || session.user.value.account) }}</span>
+            <span class="account-name">{{ session.user.value.displayName || session.user.value.account }}</span>
+          </button>
+          <div v-if="accountMenuOpen" class="account-menu" role="menu">
+            <button type="button" role="menuitem" @click="openChangePassword">
+              <KeyRound aria-hidden="true" />
+              <span>改密码</span>
+            </button>
+            <NuxtLink v-if="session.user.value.role === 'admin'" to="/admin" role="menuitem" @click="accountMenuOpen = false">
+              <ShieldCheck aria-hidden="true" />
+              <span>后台</span>
+            </NuxtLink>
+            <button type="button" class="danger-item" role="menuitem" @click="requestLogout">
+              <LogOut aria-hidden="true" />
+              <span>退出</span>
+            </button>
+          </div>
+        </div>
+      </footer>
     </aside>
 
-    <article v-if="activeNav === 'notes'" class="editor glass">
+    <article class="editor glass">
       <header class="editor-toolbar">
-        <button class="mobile-list" type="button" @click="showList = true">{{ activeNav === 'notes' ? '备忘录' : '分类' }}</button>
+        <button class="mobile-list" type="button" @click="showList = true">备忘录</button>
         <div class="toolbar-spacer" />
         <span class="save-indicator">{{ saveState === 'saving' ? '保存中...' : saveState === 'saved' ? '已保存' : selectedNote?.isDirty ? '未保存' : '' }}</span>
         <button v-if="selectedNote" class="ghost-button" type="button" @click="notesStore.deleteNote(selectedNote.id)">删除</button>
@@ -419,59 +334,32 @@ function initials(value?: string) {
       </header>
 
       <div v-if="selectedNote" class="editor-body">
-        <label class="category-select">
-          分类
-          <select v-model="selectedNote.categoryId" @change="markDirty">
-            <option :value="null">无分类</option>
-            <option v-for="category in notesStore.categories.value" :key="category.id" :value="category.id">{{ category.name }}</option>
-          </select>
-        </label>
+        <div class="tag-editor" aria-label="关键字标签">
+          <span v-for="tag in selectedNote.tags" :key="tag" class="editable-tag">
+            {{ tag }}
+            <button type="button" :title="`删除 ${tag}`" @click="removeTag(tag)">
+              <X aria-hidden="true" />
+            </button>
+          </span>
+          <input
+            v-if="tagInputOpen"
+            ref="tagInput"
+            v-model="tagDraft"
+            class="tag-input"
+            maxlength="20"
+            placeholder="关键字"
+            @keydown.enter.prevent="addTag"
+            @keydown.esc.prevent="closeTagInput"
+            @blur="tagDraft.trim() ? addTag() : closeTagInput()"
+          >
+          <button v-else-if="selectedNote.tags.length < maxTags" class="new-tag-button" type="button" @click="openTagInput">+ New Tag</button>
+        </div>
         <input v-model="selectedNote.title" class="title-input" placeholder="无标题" @input="markDirty">
         <textarea v-model="selectedNote.body" class="body-input" placeholder="开始记录..." @input="markDirty" />
       </div>
       <div v-else class="empty-state">
         <h2>未选择备忘录</h2>
-        <button class="primary-button" type="button" @click="createNoteWithCategory">新建</button>
-      </div>
-    </article>
-
-    <article v-else class="editor category-workspace glass">
-      <header class="editor-toolbar">
-        <button class="mobile-list" type="button" @click="showList = true">分类</button>
-        <div class="category-toolbar-title">
-          <strong>{{ selectedCategoryId === 'uncategorized' ? '未分类' : selectedCategory?.name || '分类详情' }}</strong>
-          <span>{{ selectedCategoryCount }} 条备忘录</span>
-        </div>
-      </header>
-
-      <div class="category-admin">
-        <p v-if="categoryError" class="error category-error">{{ categoryError }}</p>
-
-        <div class="category-detail">
-          <div class="category-detail-card">
-            <div class="category-stat">
-              <span>备忘录</span>
-              <strong>{{ selectedCategoryCount }}</strong>
-            </div>
-            <button class="primary-button" type="button" @click="openCategoryNotes(selectedCategoryId)">查看备忘录</button>
-          </div>
-
-          <section v-if="selectedCategoryId === 'uncategorized'" class="category-detail-section">
-            <h2>未分类</h2>
-            <p>没有指定分类的备忘录会显示在这里。</p>
-          </section>
-
-          <form v-else-if="selectedCategory" class="category-detail-section category-detail-form" @submit.prevent="saveSelectedCategory">
-            <label>
-              分类名称
-              <input v-model="selectedCategoryName" maxlength="40" :disabled="categorySaving">
-            </label>
-            <div class="category-detail-actions">
-              <button class="primary-button" type="submit" :disabled="categorySaving || !selectedCategoryName.trim()">保存</button>
-              <button class="ghost-button danger-text" type="button" :disabled="categorySaving" @click="requestDeleteCategory(selectedCategory)">删除分类</button>
-            </div>
-          </form>
-        </div>
+        <button class="primary-button" type="button" @click="createNote">新建</button>
       </div>
     </article>
   </section>
@@ -515,14 +403,4 @@ function initials(value?: string) {
     @confirm="confirmLogout"
   />
 
-  <ConfirmDialog
-    :open="showCategoryDeleteConfirm"
-    title="删除分类？"
-    :message="`${categoryToDelete?.name || '这个分类'} 下的备忘录会移到未分类。`"
-    confirm-text="删除"
-    :danger="true"
-    :loading="categorySaving"
-    @close="showCategoryDeleteConfirm = false"
-    @confirm="confirmDeleteCategory"
-  />
 </template>

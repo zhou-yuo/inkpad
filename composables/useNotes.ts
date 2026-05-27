@@ -5,6 +5,7 @@ type RemoteNote = {
   titleIv: string
   bodyIv: string
   categoryId?: string | null
+  tags?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -21,6 +22,7 @@ export type Note = {
   title: string
   body: string
   categoryId: string | null
+  tags: string[]
   createdAt: string
   updatedAt: string
   isDirty?: boolean
@@ -41,6 +43,7 @@ export function useNotes() {
       title: await cryptoBox.decryptText(note.encryptedTitle, note.titleIv),
       body: await cryptoBox.decryptText(note.encryptedBody, note.bodyIv),
       categoryId: note.categoryId || null,
+      tags: Array.isArray(note.tags) ? note.tags : [],
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
     }
@@ -99,7 +102,7 @@ export function useNotes() {
 
   async function createNote(categoryId: string | null = null) {
     const payload = await encryptPayload({ title: 'New Note', body: '' })
-    const response = await $fetch<{ note: RemoteNote }>('/api/notes', { method: 'POST', body: { ...payload, categoryId } })
+    const response = await $fetch<{ note: RemoteNote }>('/api/notes', { method: 'POST', body: { ...payload, categoryId, tags: [] } })
     const note = await decryptNote(response.note)
     notes.value = [note, ...notes.value]
     selectedId.value = note.id
@@ -107,9 +110,10 @@ export function useNotes() {
 
   async function saveNote(note: Note) {
     const payload = await encryptPayload(note)
-    const response = await $fetch<{ note: RemoteNote }>(`/api/notes/${note.id}`, { method: 'PUT', body: { ...payload, categoryId: note.categoryId } })
+    const response = await $fetch<{ note: RemoteNote }>(`/api/notes/${note.id}`, { method: 'PUT', body: { ...payload, categoryId: note.categoryId, tags: note.tags } })
     note.updatedAt = response.note.updatedAt
     note.categoryId = response.note.categoryId || null
+    note.tags = Array.isArray(response.note.tags) ? response.note.tags : []
     note.title = note.title.trim() || 'Untitled'
     note.isDirty = false
     notes.value = [...notes.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))

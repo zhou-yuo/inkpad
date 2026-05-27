@@ -10,6 +10,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply inkpad --remote"
   },
   "dependencies": {
+    "@lucide/vue": "^1.16.0",
     "nuxt": "^3.17.5",
     "vue": "^3.5.14"
   },
