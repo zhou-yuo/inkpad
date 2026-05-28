@@ -1,13 +1,13 @@
-name = "inkpad"
+name = "inkie"
 compatibility_date = "2026-05-24"
 pages_build_output_dir = "dist"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "inkpad"
-database_id = "fd4d33c7-f87a-48a8-a760-cc6d884d18eb"
+database_name = "inkie"
+database_id = "71a5fc00-fd1f-49d4-8780-c18b2213b927"
 
 [[env.preview.d1_databases]]
 binding = "DB"
-database_name = "inkpad-preview"
-database_id = "dbe270ab-56c4-4c3a-b9d0-8f3c2f94f48c"
+database_name = "inkie-preview"
+database_id = "0203dae5-13bc-457b-bb37-fcf8ff159457"

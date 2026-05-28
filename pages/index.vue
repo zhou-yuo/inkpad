@@ -243,10 +243,6 @@ function initials(value?: string) {
       <div class="app-icon">I</div>
       <h1>Inkpad</h1>
       <p>加密备忘录，简洁好用。</p>
-      <NuxtLink class="brand-public-link" to="/public">
-        <Globe2 aria-hidden="true" />
-        <span>查看公开备忘录</span>
-      </NuxtLink>
     </div>
 
     <form class="auth-card glass" @submit.prevent="submitAuth">
@@ -276,10 +272,6 @@ function initials(value?: string) {
       <div class="app-icon">I</div>
       <h1>已锁定</h1>
       <p>当前备忘录已锁定。</p>
-      <NuxtLink class="brand-public-link" to="/public">
-        <Globe2 aria-hidden="true" />
-        <span>查看公开备忘录</span>
-      </NuxtLink>
     </div>
     <form class="auth-card glass" @submit.prevent="unlockVault">
       <label>
