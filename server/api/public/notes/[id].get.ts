@@ -1,5 +1,6 @@
 import { createError, getRouterParam } from 'h3'
 import { getDb } from '../../../utils/db'
+import { requireUser } from '../../../utils/auth'
 
 type PublicNoteRow = {
   id: string
@@ -23,6 +24,8 @@ function parseTags(value: string | null) {
 }
 
 export default defineEventHandler(async (event) => {
+  await requireUser(event)
+
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Note id is required.' })
 

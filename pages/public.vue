@@ -21,9 +21,15 @@ const selectedNote = ref<PublicNote | null>(null)
 const loading = ref(true)
 const detailLoading = ref(false)
 const error = ref('')
+const session = useSession()
 
 onMounted(async () => {
   try {
+    const user = session.user.value || await session.refresh()
+    if (!user) {
+      await navigateTo('/')
+      return
+    }
     const response = await $fetch<{ notes: PublicNoteSummary[] }>('/api/public/notes')
     notes.value = response.notes
     selectedId.value = response.notes[0]?.id || null

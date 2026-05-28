@@ -1,4 +1,5 @@
 import { getDb } from '../../../utils/db'
+import { requireUser } from '../../../utils/auth'
 
 type PublicNoteRow = {
   id: string
@@ -20,6 +21,8 @@ function parseTags(value: string | null) {
 }
 
 export default defineEventHandler(async (event) => {
+  await requireUser(event)
+
   const rows = await getDb(event).prepare(`
     SELECT notes.id, COALESCE(users.account, users.username) AS account, notes.public_title, notes.tags, notes.published_at, notes.updated_at
     FROM notes
