@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Globe2, KeyRound, LockKeyhole, LogOut, Plus, Save, ShieldCheck, Trash2, X } from '@lucide/vue'
+import { Globe2, KeyRound, Loader2, LockKeyhole, LogOut, Plus, Save, ShieldCheck, Trash2, X } from '@lucide/vue'
 
 const session = useSession()
 const notesStore = useNotes()
@@ -28,6 +28,7 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 const passwordSaving = ref(false)
 const logoutSaving = ref(false)
+const authSubmitting = ref(false)
 const maxTags = 5
 let lockTimer: ReturnType<typeof window.setInterval> | null = null
 
@@ -79,7 +80,9 @@ async function loadNotesAndMigrateIfNeeded(password: string) {
 }
 
 async function submitAuth() {
+  if (authSubmitting.value) return
   authError.value = ''
+  authSubmitting.value = true
   try {
     if (mode.value === 'login') {
       await session.login(account.value, password.value)
@@ -90,6 +93,8 @@ async function submitAuth() {
     password.value = ''
   } catch (error: any) {
     authError.value = error?.statusMessage || error?.message || 'Authentication failed.'
+  } finally {
+    authSubmitting.value = false
   }
 }
 
@@ -263,7 +268,10 @@ function initials(value?: string) {
         <input v-model="password" type="password" autocomplete="current-password" placeholder="请输入密码" minlength="8" required>
       </label>
       <p v-if="authError" class="error">{{ authError }}</p>
-      <button class="primary-button" type="submit">{{ mode === 'login' ? '登录' : '注册' }}</button>
+      <button class="primary-button" type="submit" :disabled="authSubmitting">
+        <Loader2 v-if="authSubmitting" class="spin" :size="16" />
+        <span>{{ authSubmitting ? (mode === 'login' ? '登录中...' : '注册中...') : (mode === 'login' ? '登录' : '注册') }}</span>
+      </button>
     </form>
   </section>
 
