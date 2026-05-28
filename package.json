@@ -7,7 +7,8 @@
     "build": "nuxt build --preset=cloudflare_pages",
     "preview": "wrangler pages dev dist --compatibility-date=2026-05-24",
     "db:migrate:local": "wrangler d1 migrations apply inkpad --local",
-    "db:migrate:remote": "wrangler d1 migrations apply inkpad --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply inkpad --remote",
+    "db:migrate:preview": "wrangler d1 migrations apply DB --env preview --remote"
   },
   "dependencies": {
     "@lucide/vue": "^1.16.0",
